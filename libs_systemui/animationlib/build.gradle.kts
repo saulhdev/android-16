@@ -1,0 +1,44 @@
+plugins{
+    alias(libs.plugins.android.library)
+}
+android {
+    compileSdk = 36
+    namespace = "com.android.systemui.animationlib"
+    testNamespace = "com.android.systemui.animationlib.test"
+
+    defaultConfig {
+        minSdk = 30
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    sourceSets {
+        getByName("main") {
+            java.directories.add("src")
+            kotlin.directories.add("src")
+            res.directories.add("res")
+            manifest.srcFile("AndroidManifest.xml")
+        }
+        getByName("androidTest") {
+            java.directories.addAll(listOf("test/src", "test/robolectric/src"))
+            manifest.srcFile("test/AndroidManifest.xml")
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+    
+    buildFeatures {
+        viewBinding = true
+    }
+}
+
+dependencies{
+    implementation(project(":flags"))
+    implementation(libs.core.animation)
+    implementation(libs.core.ktx)
+    implementation(libs.kotlin.stdlib.jdk7)
+    androidTestImplementation (libs.junit)
+    androidTestImplementation (libs.rules)
+}
