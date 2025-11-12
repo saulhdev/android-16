@@ -25,7 +25,6 @@ allprojects {
     plugins.withType<AndroidBasePlugin>().configureEach {
         extensions.configure<BaseExtension> {
             buildToolsVersion = "36.1.0"
-            var compileSdk = 36
 
             defaultConfig {
                 minSdk = 26
@@ -44,14 +43,15 @@ allprojects {
 
 
     ext{
-        val FRAMEWORK_PREBUILTS_DIR: String = "$rootDir/prebuilts/libs"
-
-        val addFrameworkJar = { name: String ->
+        fun Project.addFrameworkJar(name: String) {
+            val FRAMEWORK_PREBUILTS_DIR = "$rootDir/prebuilts/libs"
             val frameworkJar = File(FRAMEWORK_PREBUILTS_DIR, name)
+            
             if (!frameworkJar.exists()) {
                 throw IllegalArgumentException("Framework jar path ${frameworkJar.path} doesn't exist")
             }
-            gradle.projectsEvaluated {
+            
+            afterEvaluate {
                 tasks.withType<JavaCompile>().configureEach {
                     classpath = files(frameworkJar, classpath)
                 }
@@ -59,8 +59,9 @@ allprojects {
                     libraries.setFrom(files(frameworkJar, libraries))
                 }
             }
+            
             dependencies {
-                compileOnly(files(frameworkJar))
+                add("compileOnly", files(frameworkJar))
             }
         }
     }
@@ -210,6 +211,9 @@ android {
 dependencies {
     implementation(project(":iconloaderlib"))
     implementation(project(":animationlib"))
+    implementation(project(":flags"))
+    implementation(project(":plugin"))
+    implementation(project(":plugincore"))
 
     implementation(libs.annotation)
     implementation(libs.coil.compose)
