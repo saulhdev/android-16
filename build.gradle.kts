@@ -1,0 +1,303 @@
+import com.android.build.gradle.BaseExtension
+import com.android.build.gradle.internal.tasks.factory.dependsOn
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.TimeZone
+
+import com.android.build.gradle.api.AndroidBasePlugin
+buildscript {
+    dependencies {
+        classpath(libs.gradle)
+    }
+}
+
+val vProtobuf = "3.25.3"
+
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.protobuf)
+}
+allprojects {
+    plugins.withType<AndroidBasePlugin>().configureEach {
+        extensions.configure<BaseExtension> {
+            buildToolsVersion = "36.1.0"
+            var compileSdk = 36
+
+            defaultConfig {
+                minSdk = 26
+                targetSdk = 35
+                vectorDrawables.useSupportLibrary = true
+            }
+            compileOptions {
+                sourceCompatibility = JavaVersion.toVersion(23)
+                targetCompatibility = JavaVersion.toVersion(23)
+            }
+        }
+        dependencies {
+            add("implementation", libs.core.ktx)
+        }
+    }
+
+
+    ext{
+        val FRAMEWORK_PREBUILTS_DIR: String = "$rootDir/prebuilts/libs"
+
+        val addFrameworkJar = { name: String ->
+            val frameworkJar = File(FRAMEWORK_PREBUILTS_DIR, name)
+            if (!frameworkJar.exists()) {
+                throw IllegalArgumentException("Framework jar path ${frameworkJar.path} doesn't exist")
+            }
+            gradle.projectsEvaluated {
+                tasks.withType<JavaCompile>().configureEach {
+                    classpath = files(frameworkJar, classpath)
+                }
+                tasks.withType<KotlinCompile>().configureEach {
+                    libraries.setFrom(files(frameworkJar, libraries))
+                }
+            }
+            dependencies {
+                compileOnly(files(frameworkJar))
+            }
+        }
+    }
+
+}
+
+android {
+    namespace = "com.android.launcher3"
+    compileSdk = 36
+
+    defaultConfig {
+        minSdk = 30
+        targetSdk = 36
+        applicationId = "com.saulhdev.launcher"
+
+        versionName = "1.0.1"
+        versionCode = 1006
+
+        buildConfigField("String", "BUILD_DATE", "\"${getBuildDate()}\"")
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    applicationVariants.all {
+        val variant = this
+        outputs.all {
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
+                "Neo_Launcher_${variant.versionName}_${variant.buildType.name}.apk"
+        }
+        variant.resValue(
+            "string",
+            "launcher_component",
+            "${variant.applicationId}/com.saulhdev.launcher.NeoLauncher"
+        )
+    }
+
+    buildTypes {
+        debug {
+            isMinifyEnabled = false
+            applicationIdSuffix = ".alpha"
+            signingConfig = signingConfigs.getByName("debug")
+        }
+        register("neo") {
+            isMinifyEnabled = false
+            applicationIdSuffix = ".neo"
+        }
+
+        release {
+            isMinifyEnabled = false
+            setProguardFiles(listOf("proguard-android-optimize.txt", "proguard.flags"))
+        }
+    }
+
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+        create("primary") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
+    buildFeatures {
+        buildConfig = true
+        compose = true
+        dataBinding = true
+        aidl = true
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+
+    packaging {
+        jniLibs {
+            pickFirsts += listOf("**/libeasyBypass.so")
+        }
+        resources.excludes.add("META-INF/LICENSE.md")
+        resources.excludes.add("META-INF/LICENSE-notice.md")
+        resources.excludes.add("META-INF/versions/9/previous-compilation-data.bin") // TODO remove when issue is fixed (https://github.com/Kotlin/kotlinx.coroutines/issues/3668)
+    }
+
+    flavorDimensionList.clear()
+    flavorDimensionList.addAll(listOf("app", "custom"))
+
+    productFlavors {
+        create("aosp") {
+            dimension = "app"
+            applicationId = "com.saulhdev.launcher"
+            testApplicationId = "com.android.launcher3.tests"
+        }
+
+        create("omega") {
+            dimension = "custom"
+        }
+    }
+
+    sourceSets {
+        named("main") {
+            res.directories.add("res")
+            java.directories.addAll(listOf("src", "src_plugins","src_ui_overrides", "src_no_quickstep"))
+            kotlin.directories.addAll(listOf("src", "src_plugins","src_ui_overrides", "src_no_quickstep"))
+            assets.directories.add("assets")
+            manifest.srcFile("AndroidManifest-common.xml")
+        }
+        named("aosp") {
+            java.directories.addAll(listOf("src_flags", "src_shortcuts_overrides"))
+            kotlin.directories.addAll(listOf("src_flags", "src_shortcuts_overrides"))
+        }
+
+        named("omega") {
+            res.directories.add("Omega/res")
+            java.directories.add("Omega/src")
+        }
+
+
+        protobuf {
+            protoc {
+                artifact = "com.google.protobuf:protoc:$vProtobuf"
+            }
+            generateProtoTasks {
+                all().forEach { task ->
+                    task.builtins {
+                        create("java") {
+                            option("lite")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
+        disable += listOf("MissingTranslation", "ExtraTranslation")
+    }
+}
+
+dependencies {
+    implementation(project(":iconloaderlib"))
+    implementation(project(":animationlib"))
+
+    implementation(libs.annotation)
+    implementation(libs.coil.compose)
+    implementation(libs.collections.immutable)
+    implementation(libs.compose.activity)
+    implementation(libs.compose.adaptive)
+    implementation(libs.compose.adaptive.layout)
+    implementation(libs.compose.adaptive.navigation)
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.navigation)
+    implementation(libs.compose.reorderable)
+    implementation(libs.compose.runtime)
+    implementation(libs.compose.ui)
+    implementation(libs.compose.ui.tooling)
+    implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.constraint.layout)
+    implementation(libs.coordinator.layout)
+    implementation(libs.core.ktx)
+    implementation(libs.coroutines.android)
+    implementation(libs.datastore.preferences)
+    implementation(libs.dynamic.animation)
+    implementation(libs.koin.android)
+    implementation(libs.koin.workmanager)
+    implementation(libs.koin.annotations)
+    implementation(libs.kotlin.stdlib) {
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-android-extensions-runtime")
+    }
+    implementation(libs.jakarta.inject)
+    implementation(libs.lifecycle.common)
+    implementation(libs.lifecycle.extensions)
+    implementation(libs.lifecycle.livedata)
+    implementation(libs.lifecycle.runtime)
+    implementation(libs.lifecycle.viewmodel)
+    implementation(libs.material)
+    implementation(libs.material.kolor)
+    implementation(libs.okhttp)
+    implementation(libs.palette.ktx)
+    implementation(libs.preference.ktx)
+    implementation(libs.protobuf.javalite)
+    implementation(libs.recyclerview)
+    implementation(libs.restriction.bypass)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    implementation(libs.serialization.json)
+
+    api(platform(libs.compose.bom))
+
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.dexmaker.mockito)
+    androidTestImplementation(libs.junit.jupiter)
+    androidTestImplementation(libs.mockito.core)
+    androidTestImplementation(libs.rules)
+    androidTestImplementation(libs.runner)
+    androidTestImplementation(libs.test.junit)
+    androidTestImplementation(libs.test.rules)
+    androidTestImplementation(libs.test.runner)
+    androidTestImplementation(libs.truth)
+    androidTestImplementation(libs.uiautomator)
+    androidTestImplementation(libs.uiautomator.v18)
+
+    androidTestImplementation(libs.dexmaker.lib)
+}
+
+// using a task as a preBuild dependency instead of a function that takes some time insures that it runs
+tasks.register("detectAndroidLocals") {
+    val langsList: MutableSet<String> = HashSet()
+
+    // in /res are (almost) all languages that have a translated string is saved. this is safer and saves some time
+    fileTree("res").visit {
+        if (this.file.path.endsWith("strings.xml")
+            && this.file.canonicalFile.readText().contains("<string")
+        ) {
+            var languageCode = this.file.parentFile?.name?.replace("values-", "")
+            languageCode = if (languageCode == "values") "en" else languageCode
+            languageCode?.let {
+                langsList.add(languageCode)
+            }
+        }
+    }
+    val langsListString = "{${langsList.sorted().joinToString(",") { "\"${it}\"" }}}"
+    android.defaultConfig.buildConfigField("String[]", "DETECTED_ANDROID_LOCALES", langsListString)
+}
+tasks.preBuild.dependsOn("detectAndroidLocals")
+
+// Returns the build date in a RFC3339 compatible format. TZ is always converted to UTC
+fun getBuildDate(): String {
+    val RFC3339_LIKE = SimpleDateFormat("yyyy-MM-dd'T'HH:mm'Z'")
+    RFC3339_LIKE.timeZone = TimeZone.getTimeZone("UTC")
+    return RFC3339_LIKE.format(Date())
+}
