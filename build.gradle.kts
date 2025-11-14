@@ -14,6 +14,49 @@ buildscript {
 
 val vProtobuf = "3.25.3"
 
+
+val FRAMEWORK_PREBUILTS_DIR = "$rootDir/prebuilt/libs"
+val addFrameworkJar = { name: String ->
+    val frameworkJar = File(FRAMEWORK_PREBUILTS_DIR, name)
+    if (!frameworkJar.exists()) {
+        throw IllegalArgumentException("Framework jar path ${frameworkJar.path} doesn't exist")
+    }
+    gradle.projectsEvaluated {
+        tasks.withType<JavaCompile>().configureEach {
+            classpath = files(frameworkJar, classpath)
+        }
+        tasks.withType<KotlinCompile>().configureEach {
+            libraries.setFrom(files(frameworkJar, libraries))
+        }
+    }
+    dependencies {
+        compileOnly(files(frameworkJar))
+    }
+}
+val compileOnlyCommonJars = {
+    dependencies {
+        compileOnly(
+            fileTree(
+                mapOf(
+                    "dir" to FRAMEWORK_PREBUILTS_DIR,
+                    "include" to listOf("SystemUI-statsd.jar")
+                )
+            )
+        )
+        compileOnly(
+            fileTree(
+                mapOf(
+                    "dir" to FRAMEWORK_PREBUILTS_DIR,
+                    "include" to listOf("WindowManager-Shell-15.jar")
+                )
+            )
+        )
+    }
+}
+extra["addFrameworkJar"] = addFrameworkJar
+extra["compileOnlyCommonJars"] = compileOnlyCommonJars
+extra["FRAMEWORK_PREBUILTS_DIR"] = FRAMEWORK_PREBUILTS_DIR
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.android.library) apply false
@@ -21,6 +64,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.protobuf)
 }
+
 allprojects {
     plugins.withType<AndroidBasePlugin>().configureEach {
         extensions.configure<BaseExtension> {
@@ -28,44 +72,19 @@ allprojects {
 
             defaultConfig {
                 minSdk = 26
-                targetSdk = 35
+                targetSdk = 36
                 vectorDrawables.useSupportLibrary = true
             }
             compileOptions {
-                sourceCompatibility = JavaVersion.toVersion(23)
-                targetCompatibility = JavaVersion.toVersion(23)
+                sourceCompatibility = JavaVersion.toVersion(21)
+                targetCompatibility = JavaVersion.toVersion(21)
             }
         }
         dependencies {
             add("implementation", libs.core.ktx)
+            add("implementation", platform(libs.compose.bom))
         }
     }
-
-
-    ext{
-        fun Project.addFrameworkJar(name: String) {
-            val FRAMEWORK_PREBUILTS_DIR = "$rootDir/prebuilts/libs"
-            val frameworkJar = File(FRAMEWORK_PREBUILTS_DIR, name)
-            
-            if (!frameworkJar.exists()) {
-                throw IllegalArgumentException("Framework jar path ${frameworkJar.path} doesn't exist")
-            }
-            
-            afterEvaluate {
-                tasks.withType<JavaCompile>().configureEach {
-                    classpath = files(frameworkJar, classpath)
-                }
-                tasks.withType<KotlinCompile>().configureEach {
-                    libraries.setFrom(files(frameworkJar, libraries))
-                }
-            }
-            
-            dependencies {
-                add("compileOnly", files(frameworkJar))
-            }
-        }
-    }
-
 }
 
 android {

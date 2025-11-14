@@ -28,7 +28,10 @@ android {
         aidl = true
     }
 }
-
+val addFrameworkJar = rootProject.extra["addFrameworkJar"] as (String) -> Unit
+addFrameworkJar("framework-15.jar")
+val compileOnlyCommonJars = rootProject.extra["compileOnlyCommonJars"] as () -> Unit
+compileOnlyCommonJars()
 dependencies{
     implementation(libs.core.ktx)
     implementation(libs.kotlin.stdlib.jdk7)

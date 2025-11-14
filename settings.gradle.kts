@@ -31,4 +31,18 @@ project(":plugin").projectDir = File(rootDir, "libs_systemui/plugin")
 include(":plugincore")
 project(":plugincore").projectDir = File(rootDir, "libs_systemui/plugin_core")
 
+include(":log")
+project(":log").projectDir = File(rootDir, "libs_systemui/log")
+
+include(":common")
+project(":common").projectDir = File(rootDir, "libs_systemui/common")
+
+include(":utils")
+project(":utils").projectDir = File(rootDir, "libs_systemui/utils")
+include(":anim")
+project(":anim").projectDir = File(rootDir, "libs_systemui/anim")
+
+include(":wmshell")
+project(":wmshell").projectDir = File(rootDir, "wmshell")
+
 rootProject.name = "Neo Launcher"
